@@ -1444,9 +1444,9 @@ static int coredump_wait(int exit_code)
 	 * Make sure nobody is waiting for us to release the VM,
 	 * otherwise we can deadlock when we wait on each other
 	 */
-	vfork_done = tsk->vfork_done;
+	vfork_done = task_aux(tsk)->vfork_done;
 	if (vfork_done) {
-		tsk->vfork_done = NULL;
+		task_aux(tsk)->vfork_done = NULL;
 		complete(vfork_done);
 	}
 

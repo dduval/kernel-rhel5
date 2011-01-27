@@ -803,6 +803,14 @@ enum sleep_type {
 
 struct prio_array;
 
+/* auxilliary task structure to avoid KABI breakage */
+struct task_struct_aux {
+	struct completion *vfork_done;  /* for vfork() [displaced from task_struct] */
+	struct list_head  *scm_work_list; /*displaced from task_struct for abi compat*/
+};
+
+#define task_aux(tsk) ((tsk)->auxilliary)
+
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
 	struct thread_info *thread_info;
@@ -867,8 +875,11 @@ struct task_struct {
 	/* PID/PID hash table linkage. */
 	struct pid_link pids[PIDTYPE_MAX];
 	struct list_head thread_group;
-
+#ifndef __GENKSYMS__
+	struct task_struct_aux *auxilliary;	/* KABI-resistant auxilliary task data */
+#else
 	struct completion *vfork_done;		/* for vfork() */
+#endif
 	int __user *set_child_tid;		/* CLONE_CHILD_SETTID */
 	int __user *clear_child_tid;		/* CLONE_CHILD_CLEARTID */
 
