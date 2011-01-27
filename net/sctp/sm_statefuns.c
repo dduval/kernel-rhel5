@@ -2133,6 +2133,8 @@ static sctp_disposition_t sctp_sf_do_5_2_6_stale(const struct sctp_endpoint *ep,
 		return SCTP_DISPOSITION_DELETE_TCB;
 	}
 
+	((struct sctp_association *)asoc)->init_retries++;
+
 	err = (sctp_errhdr_t *)(chunk->skb->data);
 
 	/* When calculating the time extension, an implementation
@@ -3404,7 +3406,6 @@ sctp_disposition_t sctp_sf_eat_fwd_tsn(const struct sctp_endpoint *ep,
 {
 	struct sctp_chunk *chunk = arg;
 	struct sctp_fwdtsn_hdr *fwdtsn_hdr;
-	struct sctp_fwdtsn_skip *skip;
 	__u16 len;
 	__u32 tsn;
 
@@ -3433,12 +3434,6 @@ sctp_disposition_t sctp_sf_eat_fwd_tsn(const struct sctp_endpoint *ep,
 	 */
 	if (sctp_tsnmap_check(&asoc->peer.tsn_map, tsn) < 0)
 		goto discard_noforce;
-
-	/* Silently discard the chunk if stream-id is not valid */
-	sctp_walk_fwdtsn(skip, chunk) {
-		if (ntohs(skip->stream) >= asoc->c.sinit_max_instreams)
-			goto discard_noforce;
-	}
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_FWDTSN, SCTP_U32(tsn));
 	if (len > sizeof(struct sctp_fwdtsn_hdr))
@@ -3471,7 +3466,6 @@ sctp_disposition_t sctp_sf_eat_fwd_tsn_fast(
 {
 	struct sctp_chunk *chunk = arg;
 	struct sctp_fwdtsn_hdr *fwdtsn_hdr;
-	struct sctp_fwdtsn_skip *skip;
 	__u16 len;
 	__u32 tsn;
 
@@ -3500,12 +3494,6 @@ sctp_disposition_t sctp_sf_eat_fwd_tsn_fast(
 	 */
 	if (sctp_tsnmap_check(&asoc->peer.tsn_map, tsn) < 0)
 		goto gen_shutdown;
-
-	/* Silently discard the chunk if stream-id is not valid */
-	sctp_walk_fwdtsn(skip, chunk) {
-		if (ntohs(skip->stream) >= asoc->c.sinit_max_instreams)
-			goto gen_shutdown;
-	}
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_FWDTSN, SCTP_U32(tsn));
 	if (len > sizeof(struct sctp_fwdtsn_hdr))

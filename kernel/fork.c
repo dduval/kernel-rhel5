@@ -48,7 +48,9 @@
 #include <linux/hash.h>
 #ifndef __GENKSYMS__
 #include <linux/ptrace.h>
+#include <linux/tty.h>
 #endif
+#include <trace/sched.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -1013,6 +1015,8 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	}
 	acct_init_pacct(&sig->pacct);
 
+	tty_audit_fork(sig);
+
 	return 0;
 }
 
@@ -1037,7 +1041,7 @@ static inline void copy_flags(unsigned long clone_flags, struct task_struct *p)
 {
 	unsigned long new_flags = p->flags;
 
-	new_flags &= ~(PF_SUPERPRIV | PF_NOFREEZE);
+	new_flags &= ~(PF_SUPERPRIV | PF_NOFREEZE | PF_PREEMPT_NOTIFIER);
 	new_flags |= PF_FORKNOEXEC;
 	new_flags |= PF_STARTING;
 	p->flags = new_flags;
@@ -1475,11 +1479,14 @@ long do_fork(unsigned long clone_flags,
 		int is_user = likely(user_mode(regs));
 		struct completion vfork;
 
+		trace_sched_process_fork(current, p);
+
 		if (clone_flags & CLONE_VFORK) {
 			task_aux(p)->vfork_done = &vfork;
 			init_completion(&vfork);
 		}
 
+		audit_finish_fork(p);
 		if (likely(is_user))
 			tracehook_report_clone(clone_flags, p);
 

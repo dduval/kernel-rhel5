@@ -152,7 +152,6 @@ typedef struct {
 	struct nfs_entry *entry;
 	decode_dirent_t	decode;
 	int		plus;
-	int		error;
 } nfs_readdir_descriptor_t;
 
 /* Now we cache directories properly, by stuffing the dirent
@@ -205,7 +204,6 @@ int nfs_readdir_filler(nfs_readdir_descriptor_t *desc, struct page *page)
 	return 0;
  error:
 	unlock_page(page);
-	desc->error = error;
 	return -EIO;
 }
 
@@ -470,13 +468,13 @@ int uncached_readdir(nfs_readdir_descriptor_t *desc, void *dirent,
 		status = -ENOMEM;
 		goto out;
 	}
-	desc->error = NFS_PROTO(inode)->readdir(file->f_dentry, cred, *desc->dir_cookie,
-						page,
+	status = NFS_PROTO(inode)->readdir(file->f_dentry, cred,
+						*desc->dir_cookie, page,
 						NFS_SERVER(inode)->dtsize,
 						desc->plus);
 	desc->page = page;
 	desc->ptr = kmap(page);		/* matching kunmap in nfs_do_filldir */
-	if (desc->error >= 0) {
+	if (status >= 0) {
 		if ((status = dir_decode(desc)) == 0)
 			desc->entry->prev_cookie = *desc->dir_cookie;
 	} else
@@ -1672,19 +1670,13 @@ int nfs_access_cache_shrinker(int nr_to_scan, gfp_t gfp_mask)
 	spin_lock(&nfs_access_lru_lock);
 restart:
 	list_for_each_entry(nfsi, &nfs_access_lru_list, access_cache_inode_lru) {
-		struct rw_semaphore *s_umount;
 		struct inode *inode;
 
 		if (nr_to_scan-- == 0)
 			break;
-		s_umount = &nfsi->vfs_inode.i_sb->s_umount;
-		if (!down_read_trylock(s_umount))
-			continue;
 		inode = igrab(&nfsi->vfs_inode);
-		if (inode == NULL) {
-			up_read(s_umount);
+		if (inode == NULL)
 			continue;
-		}
 		spin_lock(&inode->i_lock);
 		if (list_empty(&nfsi->access_cache_entry_lru))
 			goto remove_lru_entry;
@@ -1702,7 +1694,6 @@ remove_lru_entry:
 		}
 		spin_unlock(&inode->i_lock);
 		iput(inode);
-		up_read(s_umount);
 		goto restart;
 	}
 	spin_unlock(&nfs_access_lru_lock);
